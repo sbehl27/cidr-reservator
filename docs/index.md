@@ -17,4 +17,4 @@ description: |-
 
 ### Required
 
-- `reservator-bucket` (String)
+- `reservator_bucket` (String)
