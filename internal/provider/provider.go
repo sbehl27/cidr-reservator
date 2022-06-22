@@ -10,13 +10,13 @@ func New(version string) func() *schema.Provider {
 	return func() *schema.Provider {
 		return &schema.Provider{
 			Schema: map[string]*schema.Schema{
-				"reservator-bucket": {
+				"reservator_bucket": {
 					Type:     schema.TypeString,
 					Required: true,
 				},
 			},
 			ResourcesMap: map[string]*schema.Resource{
-				"network-request": resourceServer(),
+				"network_request": resourceServer(),
 			},
 			ConfigureContextFunc: providerConfigure,
 		}

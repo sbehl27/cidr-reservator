@@ -1,3 +1,3 @@
 provider "cidr-reservation" {
-  reservator-bucket = "test-cidr-reservator"
+  reservator_bucket = "test-cidr-reservator"
 }
