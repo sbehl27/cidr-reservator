@@ -1,3 +1,3 @@
-provider cidr-reservation {
-  cidr_provider_bucket="test-cidr-reservator"
+provider "cidr-reservation" {
+  reservator-bucket = "test-cidr-reservator"
 }

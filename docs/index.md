@@ -17,4 +17,4 @@ description: |-
 
 ### Required
 
-- `cidr_provider_bucket` (String)
+- `reservator-bucket` (String)
