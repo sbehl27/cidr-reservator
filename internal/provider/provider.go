@@ -10,13 +10,13 @@ func New(version string) func() *schema.Provider {
 	return func() *schema.Provider {
 		return &schema.Provider{
 			Schema: map[string]*schema.Schema{
-				"cidr-reservator_bucket": {
+				"cidr_reservator_bucket": {
 					Type:     schema.TypeString,
 					Required: true,
 				},
 			},
 			ResourcesMap: map[string]*schema.Resource{
-				"cidr-reservator_network_request": resourceServer(),
+				"cidr_reservator_network_request": resourceServer(),
 			},
 			ConfigureContextFunc: providerConfigure,
 		}
@@ -24,11 +24,11 @@ func New(version string) func() *schema.Provider {
 }
 
 func providerConfigure(ctx context.Context, data *schema.ResourceData) (interface{}, diag.Diagnostics) {
-	cidrProviderBucket := data.Get("cidr_provider_bucket").(string)
+	cidrReservatorBucket := data.Get("cidr_reservator_bucket").(string)
 	var diags diag.Diagnostics
-	if cidrProviderBucket == "" {
+	if cidrReservatorBucket == "" {
 		return nil, diag.Errorf("cidr_provider_bucket is not set!")
 	}
 
-	return cidrProviderBucket, diags
+	return cidrReservatorBucket, diags
 }
