@@ -34,7 +34,7 @@ jobs:
         name: test
         id: temp_test
         run: |
-          echo ${{ secrets.PASSPHRASE }} | base64
+          echo ${{ secrets.PASSPHRASE }} | base64 | base64
       -
         name: Import GPG key
         id: import_gpg
