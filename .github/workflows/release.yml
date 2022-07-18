@@ -12,11 +12,15 @@
 name: release
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+    #tags:
+    #  - 'v*'
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -33,6 +37,9 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
+      - uses: rymndhng/release-on-push-action@master
+        with:
+          bump_version_scheme: patch
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v3.0.0
         with:
