@@ -10,7 +10,7 @@ func New(version string) func() *schema.Provider {
 	return func() *schema.Provider {
 		return &schema.Provider{
 			Schema: map[string]*schema.Schema{
-				"reservation_bucket": {
+				"reservator_bucket": {
 					Type:     schema.TypeString,
 					Required: true,
 				},
@@ -24,7 +24,7 @@ func New(version string) func() *schema.Provider {
 }
 
 func providerConfigure(ctx context.Context, data *schema.ResourceData) (interface{}, diag.Diagnostics) {
-	cidrReservatorBucket := data.Get("cidr_reservator_bucket").(string)
+	cidrReservatorBucket := data.Get("reservator_bucket").(string)
 	var diags diag.Diagnostics
 	if cidrReservatorBucket == "" {
 		return nil, diag.Errorf("cidr_provider_bucket is not set!")
