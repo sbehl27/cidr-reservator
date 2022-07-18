@@ -46,7 +46,7 @@ func resourceServer() *schema.Resource {
 func importState(ctx context.Context, data *schema.ResourceData, i interface{}) ([]*schema.ResourceData, error) {
 	idContent := strings.Split(data.Id(), ":")
 	reservatorBucket := idContent[0]
-	baseCidr := strings.Replace(strings.ReplaceAll(idContent[1], "_", "/"), "/", ".", 3)
+	baseCidr := idContent[1]
 	netmaskId := idContent[2]
 	gcpConnector := connector.New(reservatorBucket, baseCidr)
 	networkConfig, err := gcpConnector.ReadRemote(ctx)
