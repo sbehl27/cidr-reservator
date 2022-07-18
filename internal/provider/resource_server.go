@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/sbehl27-org/terraform-provider-cidr-reservator/internal/provider/cidrCalculator"
 	"github.com/sbehl27-org/terraform-provider-cidr-reservator/internal/provider/connector"
-	"strconv"
 	"strings"
 )
 
@@ -153,7 +152,7 @@ func resourceServerUpdate(ctx context.Context, data *schema.ResourceData, m inte
 		return diag.FromErr(err)
 	}
 	netmaskId := data.Get("netmask_id").(string)
-	prefixLength, err := strconv.ParseInt(data.Get("prefix_length").(string), 10, 8)
+	prefixLength := int8(data.Get("prefix_length").(int))
 	if err != nil {
 		return diag.FromErr(err)
 	}
