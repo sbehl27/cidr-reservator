@@ -12,9 +12,9 @@ import (
 )
 
 type GcpConnector struct {
-	bucketName    string
+	BucketName    string
 	BaseCidrRange string
-	fileName      string
+	FileName      string
 	generation    int64
 }
 
@@ -37,11 +37,11 @@ func (gcp *GcpConnector) ReadRemote(ctx context.Context) (*NetworkConfig, error)
 	defer client.Close()
 
 	// Creates a Bucket instance.
-	bucket := client.Bucket(gcp.bucketName)
+	bucket := client.Bucket(gcp.BucketName)
 	if err != nil {
 		return nil, err
 	}
-	objectHandle := bucket.Object(gcp.fileName)
+	objectHandle := bucket.Object(gcp.FileName)
 	attrs, err := objectHandle.Attrs(ctx)
 	if err == nil {
 		gcp.generation = attrs.Generation
@@ -69,12 +69,12 @@ func (gcp *GcpConnector) WriteRemote(networkConfig *NetworkConfig, ctx context.C
 	}
 	defer client.Close()
 	// Creates a Bucket instance.
-	bucket := client.Bucket(gcp.bucketName)
+	bucket := client.Bucket(gcp.BucketName)
 	var writer *storage.Writer
 	if gcp.generation == -1 {
-		writer = bucket.Object(gcp.fileName).If(storage.Conditions{DoesNotExist: true}).NewWriter(ctx)
+		writer = bucket.Object(gcp.FileName).If(storage.Conditions{DoesNotExist: true}).NewWriter(ctx)
 	} else {
-		writer = bucket.Object(gcp.fileName).If(storage.Conditions{GenerationMatch: gcp.generation}).NewWriter(ctx)
+		writer = bucket.Object(gcp.FileName).If(storage.Conditions{GenerationMatch: gcp.generation}).NewWriter(ctx)
 	}
 	marshalled, err := json.Marshal(networkConfig)
 	if err != nil {

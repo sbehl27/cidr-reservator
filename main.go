@@ -25,6 +25,7 @@ var (
 	// commit  string = ""
 )
 
+// TODO: Implement terraform import!!!
 func main() {
 	var debugMode bool
 

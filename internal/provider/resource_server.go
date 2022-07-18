@@ -2,11 +2,14 @@ package provider
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/sbehl27-org/terraform-provider-cidr-reservator/internal/provider/cidrCalculator"
 	"github.com/sbehl27-org/terraform-provider-cidr-reservator/internal/provider/connector"
 	"strconv"
+	"strings"
 )
 
 func resourceServer() *schema.Resource {
@@ -34,7 +37,31 @@ func resourceServer() *schema.Resource {
 				Computed: true,
 			},
 		},
+		Importer: &schema.ResourceImporter{
+			StateContext: importState,
+		},
 	}
+}
+
+func importState(ctx context.Context, data *schema.ResourceData, i interface{}) ([]*schema.ResourceData, error) {
+	idContent := strings.Split(data.Id(), ":")
+	reservatorBucket := idContent[0]
+	baseCidr := strings.Replace(strings.ReplaceAll(idContent[1], "_", "/"), "/", ".", 3)
+	netmaskId := idContent[2]
+	gcpConnector := connector.New(reservatorBucket, baseCidr)
+	networkConfig, err := gcpConnector.ReadRemote(ctx)
+	if err != nil {
+		return nil, err
+	}
+	subnet, contains := networkConfig.Subnets[netmaskId]
+	if !contains {
+		return nil, errors.New(fmt.Sprintf("Netmask with id %s does not exist!", netmaskId))
+	}
+	prefixLength := strings.Split(subnet, "/")[1]
+	data.Set("base_cidr", baseCidr)
+	data.Set("netmask_id", netmaskId)
+	data.Set("prefix_length", prefixLength)
+	return []*schema.ResourceData{data}, nil
 }
 
 func readRemote(ctx context.Context, data *schema.ResourceData, m interface{}) (*connector.NetworkConfig, *connector.GcpConnector, error) {
@@ -100,7 +127,7 @@ func resourceServerCreateWithRetry(ctx context.Context, data *schema.ResourceDat
 			return diag.FromErr(err)
 		}
 	}
-	data.SetId(netmaskId)
+	data.SetId(fmt.Sprintf("%s:%s:%s", gcpConnector.BucketName, gcpConnector.BaseCidrRange, netmaskId))
 	err = data.Set("netmask", nextNetmask)
 	if err != nil {
 		return diag.FromErr(err)
@@ -144,7 +171,7 @@ func resourceServerUpdate(ctx context.Context, data *schema.ResourceData, m inte
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	data.SetId(netmaskId)
+	data.SetId(fmt.Sprintf("%s:%s:%s", gcpConnector.BucketName, gcpConnector.BaseCidrRange, netmaskId))
 	err = data.Set("netmask", nextNetmask)
 	if err != nil {
 		return nil
