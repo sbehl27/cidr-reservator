@@ -10,13 +10,13 @@ func New(version string) func() *schema.Provider {
 	return func() *schema.Provider {
 		return &schema.Provider{
 			Schema: map[string]*schema.Schema{
-				"cidr_reservator_bucket": {
+				"reservation_bucket": {
 					Type:     schema.TypeString,
 					Required: true,
 				},
 			},
 			ResourcesMap: map[string]*schema.Resource{
-				"cidr_reservator_network_request": resourceServer(),
+				"cidr-reservator_network_request": resourceServer(),
 			},
 			ConfigureContextFunc: providerConfigure,
 		}
