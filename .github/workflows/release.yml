@@ -11,12 +11,11 @@
 #
 name: release
 on:
-  release:
-    types: [published]
-#on:
-#  push:
-#    tags:
-#      - 'v*'
+  push:
+    branches:
+      - main
+    #tags:
+    #  - 'v*'
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
@@ -38,6 +37,12 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
+      - uses: rymndhng/release-on-push-action@master
+        with:
+          bump_version_scheme: patch
+      - id: pull_tags
+        name: pull_tags
+        run: git pull --tags
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v3.0.0
         with:
