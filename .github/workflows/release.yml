@@ -11,9 +11,12 @@
 #
 name: release
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
+#on:
+#  push:
+#    tags:
+#      - 'v*'
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
