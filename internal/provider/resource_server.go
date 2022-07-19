@@ -30,6 +30,7 @@ func resourceServer() *schema.Resource {
 			"netmask_id": {
 				Type:     schema.TypeString,
 				Required: true,
+				ForceNew: true,
 			},
 			"netmask": {
 				Type:     schema.TypeString,
