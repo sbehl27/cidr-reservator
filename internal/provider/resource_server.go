@@ -88,112 +88,135 @@ func readRemote(ctx context.Context, data *schema.ResourceData, m interface{}) (
 	return networkConfig, &gcpConnector, nil
 }
 
-//TODO: Throw error if netmask_id already exists!!!
-func resourceServerCreate(ctx context.Context, data *schema.ResourceData, m interface{}) diag.Diagnostics {
-	return resourceServerCreateWithRetry(ctx, data, m, 0)
+func retry(toRetry func() error) error {
+	n := 0
+	var err error
+	for n < 4 {
+		err = toRetry()
+		if err == nil {
+			break
+		}
+		n++
+	}
+	return err
 }
 
-func resourceServerCreateWithRetry(ctx context.Context, data *schema.ResourceData, m interface{}, retry int8) diag.Diagnostics {
+func resourceServerCreate(ctx context.Context, data *schema.ResourceData, m interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
-	networkConfig, gcpConnector, err := readRemote(ctx, data, m)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	if data.Get("id") != nil {
-		return diags
-	}
-	netmaskId := data.Get("netmask_id").(string)
-	if _, contains := networkConfig.Subnets[netmaskId]; contains {
-		return diag.Errorf("The netmaskId %s already exists, but does not belong to your Terraform state!!!", netmaskId)
-	}
-	prefixLength := int8(data.Get("prefix_length").(int))
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	newCidrCalculator, err := cidrCalculator.New(&networkConfig.Subnets, prefixLength, gcpConnector.BaseCidrRange)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	nextNetmask, err := newCidrCalculator.GetNextNetmask()
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	networkConfig.Subnets[netmaskId] = nextNetmask
-	err = gcpConnector.WriteRemote(networkConfig, ctx)
-	if err != nil {
-		if retry < 4 {
-			return resourceServerCreateWithRetry(ctx, data, m, retry+1)
-		} else {
-			return diag.FromErr(err)
-		}
-	}
-	data.SetId(fmt.Sprintf("%s:%s:%s", gcpConnector.BucketName, gcpConnector.BaseCidrRange, netmaskId))
-	err = data.Set("netmask", nextNetmask)
+	err := retry(innerResourceServerCreate(ctx, data, m))
 	if err != nil {
 		return diag.FromErr(err)
 	}
 	return diags
+}
+
+func innerResourceServerCreate(ctx context.Context, data *schema.ResourceData, m interface{}) func() error {
+	return func() error {
+		networkConfig, gcpConnector, err := readRemote(ctx, data, m)
+		if err != nil {
+			return err
+		}
+		if data.Get("id") != nil {
+			return nil
+		}
+		netmaskId := data.Get("netmask_id").(string)
+		if _, contains := networkConfig.Subnets[netmaskId]; contains {
+			return fmt.Errorf("The netmaskId %s already exists, but does not belong to your Terraform state!!!", netmaskId)
+		}
+		prefixLength := int8(data.Get("prefix_length").(int))
+		if err != nil {
+			return err
+		}
+		newCidrCalculator, err := cidrCalculator.New(&networkConfig.Subnets, prefixLength, gcpConnector.BaseCidrRange)
+		if err != nil {
+			return err
+		}
+		nextNetmask, err := newCidrCalculator.GetNextNetmask()
+		if err != nil {
+			return err
+		}
+		networkConfig.Subnets[netmaskId] = nextNetmask
+		err = gcpConnector.WriteRemote(networkConfig, ctx)
+		if err != nil {
+			return err
+		}
+		data.SetId(fmt.Sprintf("%s:%s:%s", gcpConnector.BucketName, gcpConnector.BaseCidrRange, netmaskId))
+		err = data.Set("netmask", nextNetmask)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 }
 
 func resourceServerRead(ctx context.Context, data *schema.ResourceData, m interface{}) diag.Diagnostics {
-	//var diags diag.Diagnostics
-	//_, _, err := readRemote(ctx, data, m)
-	//if err != nil {
-	//	return diag.FromErr(err)
-	//}
-	//return diags
 	return nil
 }
 
-//TODO: implement with retry
 func resourceServerUpdate(ctx context.Context, data *schema.ResourceData, m interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
-	networkConfig, gcpConnector, err := readRemote(ctx, data, m)
+	err := retry(innerResourceServerUpdate(ctx, data, m))
 	if err != nil {
 		return diag.FromErr(err)
-	}
-	netmaskId := data.Get("netmask_id").(string)
-	prefixLength := int8(data.Get("prefix_length").(int))
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	delete(networkConfig.Subnets, "netmask_id")
-	newCidrCalculator, err := cidrCalculator.New(&networkConfig.Subnets, int8(prefixLength), gcpConnector.BaseCidrRange)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	nextNetmask, err := newCidrCalculator.GetNextNetmask()
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	networkConfig.Subnets[netmaskId] = nextNetmask
-	err = gcpConnector.WriteRemote(networkConfig, ctx)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	data.SetId(fmt.Sprintf("%s:%s:%s", gcpConnector.BucketName, gcpConnector.BaseCidrRange, netmaskId))
-	err = data.Set("netmask", nextNetmask)
-	if err != nil {
-		return nil
 	}
 	return diags
 }
 
-//TODO: implement with retry!
+func innerResourceServerUpdate(ctx context.Context, data *schema.ResourceData, m interface{}) func() error {
+	return func() error {
+		networkConfig, gcpConnector, err := readRemote(ctx, data, m)
+		if err != nil {
+			return err
+		}
+		netmaskId := data.Get("netmask_id").(string)
+		prefixLength := int8(data.Get("prefix_length").(int))
+		if err != nil {
+			return err
+		}
+		delete(networkConfig.Subnets, "netmask_id")
+		newCidrCalculator, err := cidrCalculator.New(&networkConfig.Subnets, int8(prefixLength), gcpConnector.BaseCidrRange)
+		if err != nil {
+			return err
+		}
+		nextNetmask, err := newCidrCalculator.GetNextNetmask()
+		if err != nil {
+			return err
+		}
+		networkConfig.Subnets[netmaskId] = nextNetmask
+		err = gcpConnector.WriteRemote(networkConfig, ctx)
+		if err != nil {
+			return err
+		}
+		data.SetId(fmt.Sprintf("%s:%s:%s", gcpConnector.BucketName, gcpConnector.BaseCidrRange, netmaskId))
+		err = data.Set("netmask", nextNetmask)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
 func resourceServerDelete(ctx context.Context, data *schema.ResourceData, m interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
-	networkConfig, gcpConnector, err := readRemote(ctx, data, m)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	netmaskId := data.Get("id").(string)
-	if netmaskId != "" {
-		return diags
-	}
-	delete(networkConfig.Subnets, netmaskId)
-	err = gcpConnector.WriteRemote(networkConfig, ctx)
+	err := retry(innerResourceServerDelete(ctx, data, m))
 	if err != nil {
 		return diag.FromErr(err)
 	}
 	return diags
+}
+
+func innerResourceServerDelete(ctx context.Context, data *schema.ResourceData, m interface{}) func() error {
+	return func() error {
+		networkConfig, gcpConnector, err := readRemote(ctx, data, m)
+		if err != nil {
+			return err
+		}
+		netmaskId := data.Get("netmask_id").(string)
+		delete(networkConfig.Subnets, netmaskId)
+		err = gcpConnector.WriteRemote(networkConfig, ctx)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 }
