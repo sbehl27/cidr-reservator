@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/sbehl27-org/terraform-provider-cidr-reservator/internal/provider/cidrCalculator"
 	"github.com/sbehl27-org/terraform-provider-cidr-reservator/internal/provider/connector"
+	"strconv"
 	"strings"
 )
 
@@ -30,7 +31,6 @@ func resourceServer() *schema.Resource {
 			"netmask_id": {
 				Type:     schema.TypeString,
 				Required: true,
-				ForceNew: true,
 			},
 			"netmask": {
 				Type:     schema.TypeString,
@@ -162,36 +162,52 @@ func resourceServerUpdate(ctx context.Context, data *schema.ResourceData, m inte
 	return diags
 }
 
+// TODO: if netmask_id already exists, which does not belong to THIS state, throw error.
+// TODO: Update of netmask_id should not enforce recreate.
 func innerResourceServerUpdate(ctx context.Context, data *schema.ResourceData, m interface{}) func() error {
 	return func() error {
 		networkConfig, gcpConnector, err := readRemote(ctx, data, m)
 		if err != nil {
 			return err
 		}
+		id := data.Id()
+		valuesFromId := strings.Split(id, ":")
 		netmaskId := data.Get("netmask_id").(string)
+		netmaskIdFromId := valuesFromId[2]
+		currentSubnet := networkConfig.Subnets[netmaskIdFromId]
+		if netmaskIdFromId != netmaskId {
+			delete(networkConfig.Subnets, netmaskIdFromId)
+			if _, contains := networkConfig.Subnets[netmaskId]; contains {
+				return fmt.Errorf("The netmaskId %s already exists, but does not belong to your Terraform state!!!", netmaskId)
+			}
+			networkConfig.Subnets[netmaskId] = currentSubnet
+		}
+		currentPrefixLength, err := strconv.ParseInt(strings.Split(currentSubnet, "/")[1], 10, 8)
+		if err != nil {
+			return err
+		}
 		prefixLength := int8(data.Get("prefix_length").(int))
-		if err != nil {
-			return err
+		baseCidrRangeFromId := valuesFromId[1]
+		if (baseCidrRangeFromId != gcpConnector.BaseCidrRange) || (int8(currentPrefixLength) != prefixLength) {
+			newCidrCalculator, err := cidrCalculator.New(&networkConfig.Subnets, int8(prefixLength), gcpConnector.BaseCidrRange)
+			if err != nil {
+				return err
+			}
+			nextNetmask, err := newCidrCalculator.GetNextNetmask()
+			if err != nil {
+				return err
+			}
+			networkConfig.Subnets[netmaskId] = nextNetmask
+			err = data.Set("netmask", nextNetmask)
+			if err != nil {
+				return err
+			}
 		}
-		delete(networkConfig.Subnets, "netmask_id")
-		newCidrCalculator, err := cidrCalculator.New(&networkConfig.Subnets, int8(prefixLength), gcpConnector.BaseCidrRange)
-		if err != nil {
-			return err
-		}
-		nextNetmask, err := newCidrCalculator.GetNextNetmask()
-		if err != nil {
-			return err
-		}
-		networkConfig.Subnets[netmaskId] = nextNetmask
 		err = gcpConnector.WriteRemote(networkConfig, ctx)
 		if err != nil {
 			return err
 		}
 		data.SetId(fmt.Sprintf("%s:%s:%s", gcpConnector.BucketName, gcpConnector.BaseCidrRange, netmaskId))
-		err = data.Set("netmask", nextNetmask)
-		if err != nil {
-			return err
-		}
 		return nil
 	}
 }
