@@ -1,8 +1,8 @@
 terraform {
   required_providers {
-    cidr-reservation = {
-      version = "~> 1.0.0"
-      source  = "terraform-example.com/sbehl/cidr-reservation"
+    cidr-reservator = {
+      version = "~> 0.0.1"
+      source  = "terraform-example.com/test/cidr-reservator"
     }
   }
 }

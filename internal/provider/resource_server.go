@@ -38,7 +38,8 @@ func resourceServer() *schema.Resource {
 			},
 		},
 		Importer: &schema.ResourceImporter{
-			StateContext: importState,
+			StateContext: schema.ImportStatePassthroughContext,
+			// StateContext: importState,
 		},
 	}
 }
@@ -65,6 +66,7 @@ func importState(ctx context.Context, data *schema.ResourceData, i interface{}) 
 }
 
 func readRemote(ctx context.Context, data *schema.ResourceData, m interface{}) (*connector.NetworkConfig, *connector.GcpConnector, error) {
+
 	cidrProviderBucket := m.(string)
 	gcpConnector := connector.New(cidrProviderBucket, data.Get("base_cidr").(string))
 	networkConfig, err := gcpConnector.ReadRemote(ctx)
@@ -150,7 +152,35 @@ func innerResourceServerCreate(ctx context.Context, data *schema.ResourceData, m
 }
 
 func resourceServerRead(ctx context.Context, data *schema.ResourceData, m interface{}) diag.Diagnostics {
-	return nil
+	var diags diag.Diagnostics
+	idContent := strings.Split(data.Id(), ":")
+	reservatorBucket := idContent[0]
+	baseCidr := idContent[1]
+	netmaskId := idContent[2]
+	gcpConnector := connector.New(reservatorBucket, baseCidr)
+	networkConfig, err := gcpConnector.ReadRemote(ctx)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	subnet, contains := networkConfig.Subnets[netmaskId]
+	if !contains {
+		return diag.FromErr(errors.New(fmt.Sprintf("Netmask with id %s does not exist!", netmaskId)))
+	}
+	prefixLength := strings.Split(subnet, "/")[1]
+	data.Set("base_cidr", baseCidr)
+	data.Set("netmask_id", netmaskId)
+	data.Set("prefix_length", prefixLength)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	if data.Get("id") != nil {
+		return nil
+	}
+	if _, contains := networkConfig.Subnets[netmaskId]; !contains {
+		return diag.FromErr(fmt.Errorf("The netmask for the netmaskId %s does not exist!!!", netmaskId))
+	}
+	data.Set("netmask", networkConfig.Subnets[netmaskId])
+	return diags
 }
 
 func resourceServerUpdate(ctx context.Context, data *schema.ResourceData, m interface{}) diag.Diagnostics {
