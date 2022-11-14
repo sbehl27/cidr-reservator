@@ -1,8 +1,7 @@
-package provider
+package cidrCalculator
 
 import (
 	"fmt"
-	cidrCalculator2 "github.com/sbehl27-org/terraform-provider-cidr-reservator/internal/provider/cidrCalculator"
 	"testing"
 )
 
@@ -22,7 +21,7 @@ func initTestData() *TestData {
 
 func TestCorrectNextCidr(t *testing.T) {
 	testData := initTestData()
-	cidrCalculator, err := cidrCalculator2.New(testData.currentSubnets, testData.prefixLength, testData.baseCidrRange)
+	cidrCalculator, err := New(testData.currentSubnets, testData.prefixLength, testData.baseCidrRange)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +39,7 @@ func TestBaseCidrExhausted(t *testing.T) {
 	expected := fmt.Sprintf("baseCidrRange %s is exhausted!", testData.baseCidrRange)
 	(*testData.currentSubnets)["testExhausted"] = "10.5.128.0/17"
 	testData.prefixLength = 17
-	theCidrCalculator, err := cidrCalculator2.New(testData.currentSubnets, testData.prefixLength, testData.baseCidrRange)
+	theCidrCalculator, err := New(testData.currentSubnets, testData.prefixLength, testData.baseCidrRange)
 	if err != nil {
 		t.Fatal(err)
 	}
