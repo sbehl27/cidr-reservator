@@ -27,6 +27,7 @@ func resourceServer() *schema.Resource {
 			"base_cidr": {
 				Type:     schema.TypeString,
 				Required: true,
+				ForceNew: true,
 			},
 			"netmask_id": {
 				Type:     schema.TypeString,
