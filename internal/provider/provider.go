@@ -27,7 +27,7 @@ func providerConfigure(ctx context.Context, data *schema.ResourceData) (interfac
 	cidrReservatorBucket := data.Get("reservator_bucket").(string)
 	var diags diag.Diagnostics
 	if cidrReservatorBucket == "" {
-		return nil, diag.Errorf("cidr_provider_bucket is not set!")
+		return nil, diag.Errorf("reservator_bucket is not set!")
 	}
 
 	return cidrReservatorBucket, diags

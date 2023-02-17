@@ -28,7 +28,7 @@ func New(currentSubnets *map[string]string, prefixLength int8, baseCidrRange str
 	return cidrCalculator{currentSubnets, prefixLength, baseCidrRange, int8(baseCidrPrefixLength) - 1, baseIPNet}, nil
 }
 
-//TODO: implement!
+// TODO: implement!
 func (c cidrCalculator) GetNextNetmask() (string, error) {
 	if c.prefixLength > 32 || c.prefixLength < 0 {
 		return "", errors.New("prefixLength must be an integer between 0 and 32")
@@ -85,7 +85,11 @@ func (c cidrCalculator) recursivelyFindNextNetmask(ipNets *[]*net.IPNet, searchP
 			//if index < len(*ipNets)-1 && bytes.Equal(mask, (*ipNets)[index+1].Mask) {
 			//	continue
 			//}
-			nextIPNet, exhausted := cidr.NextSubnet(ipNet, int(c.prefixLength))
+			nextIPNet, exhausted := cidr.PreviousSubnet(ipNet, int(c.prefixLength))
+			// Previous subnet might contain the current subnet of the iteration if the searched prefix is smaller than the iterated subnet's one
+			if !exhausted && nextIPNet.Contains((*ipNets)[index].IP) {
+				nextIPNet, exhausted = cidr.PreviousSubnet(nextIPNet, int(c.prefixLength))
+			}
 			if exhausted {
 				return nil, fmt.Errorf("Maximum IP exhausted!")
 			}
@@ -96,7 +100,18 @@ func (c cidrCalculator) recursivelyFindNextNetmask(ipNets *[]*net.IPNet, searchP
 			} else {
 				return nextIPNet, nil
 			}
-			return c.recursivelyFindNextNetmask(ipNets, searchPrefixLength-1)
+			nextIPNet, exhausted = cidr.NextSubnet(ipNet, int(c.prefixLength))
+			if exhausted {
+				return nil, fmt.Errorf("Maximum IP exhausted!")
+			}
+			if index > 0 {
+				if !nextIPNet.Contains((*ipNets)[index-1].IP) {
+					return nextIPNet, nil
+				}
+			} else {
+				return nextIPNet, nil
+			}
+			//return c.recursivelyFindNextNetmask(ipNets, searchPrefixLength-1)
 		}
 	}
 	return c.recursivelyFindNextNetmask(ipNets, searchPrefixLength-1)
