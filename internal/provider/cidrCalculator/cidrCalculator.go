@@ -57,7 +57,7 @@ func (c cidrCalculator) GetNextNetmask() (string, error) {
 	if len(ipNets) == 0 || (!ipNets[len(ipNets)-1].Contains(firstCidrSubnetFirstIP) && !ipNets[len(ipNets)-1].Contains(firstCidrSubnetLastIP)) {
 		nextIPNet = firstCidrSubnet
 	} else {
-		nextIPNet, err = c.recursivelyFindNextNetmask(&ipNets, c.prefixLength)
+		nextIPNet, err = c.recursivelyFindNextNetmask(&ipNets, c.prefixLength, false)
 	}
 	if err != nil {
 		return "", err
@@ -66,12 +66,17 @@ func (c cidrCalculator) GetNextNetmask() (string, error) {
 	if !c.baseIPNet.Contains(nextIPNet.IP) {
 		return "", fmt.Errorf("baseCidrRange %s is exhausted!", c.baseCidrRange)
 	}
+	err = cidr.VerifyNoOverlap(append(ipNets, nextIPNet), c.baseIPNet)
+	if err != nil {
+		return "", fmt.Errorf("The produced subnet overlaps with existing subnets! This should not happen and is a bug. Please report it!")
+	}
 	return nextIPNet.String(), nil
 }
 
-func (c cidrCalculator) recursivelyFindNextNetmask(ipNets *[]*net.IPNet, searchPrefixLength int8) (*net.IPNet, error) {
+// This algorithm first tries to find the next subnet and fill "gaps" as good as possible. Therefore it starts to search at an already reserved subnet with equal or smaller prefix size. It afterwards continues with bigger prefix sizes.
+func (c cidrCalculator) recursivelyFindNextNetmask(ipNets *[]*net.IPNet, searchPrefixLength int8, doneWithBiggerEqualPrefix bool) (*net.IPNet, error) {
 	if searchPrefixLength <= c.baseCidrPrefixLength {
-		lastSubnet := (*ipNets)[len(*ipNets)-1]
+		lastSubnet := (*ipNets)[0]
 		nextIPNet, exhausted := cidr.NextSubnet(lastSubnet, int(c.prefixLength))
 		if exhausted {
 			return nil, fmt.Errorf("Maximum IP exhausted!")
@@ -80,39 +85,52 @@ func (c cidrCalculator) recursivelyFindNextNetmask(ipNets *[]*net.IPNet, searchP
 	}
 	_, maskNet, _ := net.ParseCIDR(fmt.Sprintf("0.0.0.0/%d", searchPrefixLength))
 	mask := maskNet.Mask
+	var previousRunSubnet *net.IPNet
 	for index, ipNet := range *ipNets {
-		if bytes.Compare(mask, ipNet.Mask) <= 0 {
-			//if index < len(*ipNets)-1 && bytes.Equal(mask, (*ipNets)[index+1].Mask) {
-			//	continue
-			//}
-			nextIPNet, exhausted := cidr.PreviousSubnet(ipNet, int(c.prefixLength))
-			// Previous subnet might contain the current subnet of the iteration if the searched prefix is smaller than the iterated subnet's one
-			if !exhausted && nextIPNet.Contains((*ipNets)[index].IP) {
-				nextIPNet, exhausted = cidr.PreviousSubnet(nextIPNet, int(c.prefixLength))
+		compare := bytes.Compare(mask, ipNet.Mask)
+		if compare <= 0 && !doneWithBiggerEqualPrefix {
+			nextSubnet, noOverlap, err := c.getNextSubnetVerifyNoOverlap(index, ipNets, previousRunSubnet)
+			if err != nil {
+				return nil, err
 			}
-			if exhausted {
-				return nil, fmt.Errorf("Maximum IP exhausted!")
+			if noOverlap {
+				return nextSubnet, nil
 			}
-			if index < len(*ipNets)-1 {
-				if !nextIPNet.Contains((*ipNets)[index+1].IP) {
-					return nextIPNet, nil
-				}
-			} else {
-				return nextIPNet, nil
+			previousRunSubnet = nextSubnet
+		} else if doneWithBiggerEqualPrefix && compare == 0 {
+			nextSubnet, noOverlap, err := c.getNextSubnetVerifyNoOverlap(index, ipNets, previousRunSubnet)
+			if err != nil {
+				return nil, err
 			}
-			nextIPNet, exhausted = cidr.NextSubnet(ipNet, int(c.prefixLength))
-			if exhausted {
-				return nil, fmt.Errorf("Maximum IP exhausted!")
+			if noOverlap {
+				return nextSubnet, nil
 			}
-			if index > 0 {
-				if !nextIPNet.Contains((*ipNets)[index-1].IP) {
-					return nextIPNet, nil
-				}
-			} else {
-				return nextIPNet, nil
-			}
-			//return c.recursivelyFindNextNetmask(ipNets, searchPrefixLength-1)
 		}
 	}
-	return c.recursivelyFindNextNetmask(ipNets, searchPrefixLength-1)
+	return c.recursivelyFindNextNetmask(ipNets, searchPrefixLength-1, true)
+}
+
+func (c cidrCalculator) getNextSubnetVerifyNoOverlap(index int, ipNets *[]*net.IPNet, previousRunSubnet *net.IPNet) (*net.IPNet, bool, error) {
+	var previousSubnet *net.IPNet
+	if index > 0 {
+		previousSubnet = (*ipNets)[index-1]
+	}
+	calculatedNextSubnet, exhausted := cidr.NextSubnet((*ipNets)[index], int(c.prefixLength))
+	if exhausted {
+		return nil, false, fmt.Errorf("Maximum IP exhausted!")
+	}
+	if !c.baseIPNet.Contains(calculatedNextSubnet.IP) {
+		return calculatedNextSubnet, false, nil
+	}
+	if previousSubnet != nil {
+		if !calculatedNextSubnet.Contains(previousSubnet.IP) && !previousSubnet.Contains(calculatedNextSubnet.IP) {
+			if previousRunSubnet == nil || !previousRunSubnet.Contains(calculatedNextSubnet.IP) {
+				return calculatedNextSubnet, true, nil
+			}
+		}
+	} else {
+		// in this case there is no previous subnet in the list; as this iteration is reverse over the list, this means, we already have the last reserved subnet
+		return calculatedNextSubnet, true, nil
+	}
+	return calculatedNextSubnet, false, nil
 }

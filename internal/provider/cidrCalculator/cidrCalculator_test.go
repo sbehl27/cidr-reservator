@@ -13,7 +13,7 @@ type TestData struct {
 
 func initTestData() *TestData {
 	return &TestData{
-		currentSubnets: &map[string]string{"test1": "10.116.4.0/22", "test3": "10.116.0.0/24", "test4": "10.116.2.0/25", "test5": "10.116.3.0/24", "test6": "10.119.0.0/16", "foo": "10.116.8.0/24"},
+		currentSubnets: &map[string]string{"test1": "10.116.0.16/29", "test3": "10.116.0.0/29", "test4": "10.116.3.0/24", "test5": "10.116.8.0/22", "test6": "10.116.4.0/22", "foo": "10.116.2.0/24", "tralala": "10.116.1.0/24", "tut": "10.116.0.8/29", "fioo": "10.116.0.32/28", "tutut": "10.119.0.0/16"},
 		prefixLength:   25,
 		baseCidrRange:  "10.116.0.0/14",
 	}
@@ -29,7 +29,7 @@ func TestCorrectNextCidr(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if netmask != "10.116.1.128/25" {
+	if netmask != "10.116.0.128/25" {
 		t.Fatalf("Unexpected value for next netmask %s", netmask)
 	}
 }
@@ -45,7 +45,7 @@ func TestCorrectNextCidr16StillFits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if netmask != "10.118.0.0/16" {
+	if netmask != "10.117.0.0/16" {
 		t.Fatalf("Unexpected value for next netmask %s", netmask)
 	}
 }
