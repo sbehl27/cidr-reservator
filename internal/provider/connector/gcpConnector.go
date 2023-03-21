@@ -6,16 +6,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"strings"
 	"time"
 )
 
 type GcpConnector struct {
-	BucketName    string
-	BaseCidrRange string
-	FileName      string
-	generation    int64
+	BucketName             string
+	BaseCidrRange          string
+	FileName               string
+	FileNameWithoutMinus   string
+	generation             int64
+	FileWithoutMinusExists bool
 }
 
 type NetworkConfig struct {
@@ -23,8 +25,9 @@ type NetworkConfig struct {
 }
 
 func New(bucketName string, baseCidr string) GcpConnector {
-	fileName := fmt.Sprintf("cidr-reservation/baseCidr-%s.json", strings.Replace(strings.Replace(baseCidr, ".", "", -1), "/", "", -1))
-	return GcpConnector{bucketName, baseCidr, fileName, -1}
+	fileName := fmt.Sprintf("cidr-reservation/baseCidr-%s.json", strings.Replace(strings.Replace(baseCidr, ".", "-", -1), "/", "-", -1))
+	fileNameWithoutMinus := fmt.Sprintf("cidr-reservation/baseCidr-%s.json", strings.Replace(strings.Replace(baseCidr, ".", "", -1), "/", "", -1))
+	return GcpConnector{bucketName, baseCidr, fileName, fileNameWithoutMinus, -1}
 }
 
 func (gcp *GcpConnector) ReadRemote(ctx context.Context) (*NetworkConfig, error) {
@@ -41,17 +44,20 @@ func (gcp *GcpConnector) ReadRemote(ctx context.Context) (*NetworkConfig, error)
 	if err != nil {
 		return nil, err
 	}
-	objectHandle := bucket.Object(gcp.FileName)
+	objectHandle := bucket.Object(gcp.FileNameWithoutMinus)
 	attrs, err := objectHandle.Attrs(ctx)
 	if err == nil {
 		gcp.generation = attrs.Generation
 	}
 	rc, err := objectHandle.NewReader(ctx)
 	if err != nil {
+		if err == storage.ErrObjectNotExist {
+			objectHandle = bucket.Object(gcp.FileName)
+		}
 		return &networkConfig, err
 	}
 	defer rc.Close()
-	slurp, err := ioutil.ReadAll(rc)
+	slurp, err := io.ReadAll(rc)
 	if err != nil {
 		return &networkConfig, err
 	}
@@ -119,5 +125,5 @@ func readNetsegmentJson(ctx context.Context, cidrProviderBucket string, netsegme
 	//return readRemote(cidrProviderBucket, fmt.Sprintf("gcp-cidr-provider/%s.json", netsegmentName), ctx)
 }
 
-//TODO: implement!
+// TODO: implement!
 func uploadNewNetsegmentJson() {}
