@@ -6,7 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"io"
 	"strings"
 	"time"
 )
@@ -23,7 +24,7 @@ type NetworkConfig struct {
 }
 
 func New(bucketName string, baseCidr string) GcpConnector {
-	fileName := fmt.Sprintf("cidr-reservation/baseCidr-%s.json", strings.Replace(strings.Replace(baseCidr, ".", "", -1), "/", "", -1))
+	fileName := fmt.Sprintf("cidr-reservation/baseCidr-%s.json", strings.Replace(strings.Replace(baseCidr, ".", "-", -1), "/", "-", -1))
 	return GcpConnector{bucketName, baseCidr, fileName, -1}
 }
 
@@ -51,7 +52,7 @@ func (gcp *GcpConnector) ReadRemote(ctx context.Context) (*NetworkConfig, error)
 		return &networkConfig, err
 	}
 	defer rc.Close()
-	slurp, err := ioutil.ReadAll(rc)
+	slurp, err := io.ReadAll(rc)
 	if err != nil {
 		return &networkConfig, err
 	}
@@ -82,6 +83,7 @@ func (gcp *GcpConnector) WriteRemote(networkConfig *NetworkConfig, ctx context.C
 	}
 	_, _ = writer.Write(marshalled)
 	if err := writer.Close(); err != nil {
+		tflog.Error(ctx, "Failed to write file to GCP", map[string]interface{}{"error": err, "generation": gcp.generation})
 		return err
 	}
 	return nil
@@ -119,5 +121,5 @@ func readNetsegmentJson(ctx context.Context, cidrProviderBucket string, netsegme
 	//return readRemote(cidrProviderBucket, fmt.Sprintf("gcp-cidr-provider/%s.json", netsegmentName), ctx)
 }
 
-//TODO: implement!
+// TODO: implement!
 func uploadNewNetsegmentJson() {}

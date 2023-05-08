@@ -4,6 +4,12 @@ resource "cidr-reservator_network_request" "network_request" {
   netmask_id    = "test"
 }
 
+resource "cidr-reservator_network_request" "network_request3" {
+  prefix_length = 26
+  base_cidr     = "10.5.0.0/16"
+  netmask_id    = "test2"
+}
+
 resource "cidr-reservator_network_request" "network_request2" {
   prefix_length = 26
   base_cidr     = "10.6.0.0/18"

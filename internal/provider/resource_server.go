@@ -67,7 +67,6 @@ func importState(ctx context.Context, data *schema.ResourceData, i interface{}) 
 }
 
 func readRemote(ctx context.Context, data *schema.ResourceData, m interface{}) (*connector.NetworkConfig, *connector.GcpConnector, error) {
-
 	cidrProviderBucket := m.(string)
 	gcpConnector := connector.New(cidrProviderBucket, data.Get("base_cidr").(string))
 	networkConfig, err := gcpConnector.ReadRemote(ctx)
