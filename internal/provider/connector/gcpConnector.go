@@ -6,18 +6,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"io"
 	"strings"
 	"time"
 )
 
 type GcpConnector struct {
-	BucketName             string
-	BaseCidrRange          string
-	FileName               string
-	FileNameWithoutMinus   string
-	generation             int64
-	FileWithoutMinusExists bool
+	BucketName    string
+	BaseCidrRange string
+	FileName      string
+	generation    int64
 }
 
 type NetworkConfig struct {
@@ -26,8 +25,7 @@ type NetworkConfig struct {
 
 func New(bucketName string, baseCidr string) GcpConnector {
 	fileName := fmt.Sprintf("cidr-reservation/baseCidr-%s.json", strings.Replace(strings.Replace(baseCidr, ".", "-", -1), "/", "-", -1))
-	fileNameWithoutMinus := fmt.Sprintf("cidr-reservation/baseCidr-%s.json", strings.Replace(strings.Replace(baseCidr, ".", "", -1), "/", "", -1))
-	return GcpConnector{bucketName, baseCidr, fileName, fileNameWithoutMinus, -1}
+	return GcpConnector{bucketName, baseCidr, fileName, -1}
 }
 
 func (gcp *GcpConnector) ReadRemote(ctx context.Context) (*NetworkConfig, error) {
@@ -44,16 +42,13 @@ func (gcp *GcpConnector) ReadRemote(ctx context.Context) (*NetworkConfig, error)
 	if err != nil {
 		return nil, err
 	}
-	objectHandle := bucket.Object(gcp.FileNameWithoutMinus)
+	objectHandle := bucket.Object(gcp.FileName)
 	attrs, err := objectHandle.Attrs(ctx)
 	if err == nil {
 		gcp.generation = attrs.Generation
 	}
 	rc, err := objectHandle.NewReader(ctx)
 	if err != nil {
-		if err == storage.ErrObjectNotExist {
-			objectHandle = bucket.Object(gcp.FileName)
-		}
 		return &networkConfig, err
 	}
 	defer rc.Close()
@@ -88,6 +83,7 @@ func (gcp *GcpConnector) WriteRemote(networkConfig *NetworkConfig, ctx context.C
 	}
 	_, _ = writer.Write(marshalled)
 	if err := writer.Close(); err != nil {
+		tflog.Error(ctx, "Failed to write file to GCP", map[string]interface{}{"error": err, "generation": gcp.generation})
 		return err
 	}
 	return nil

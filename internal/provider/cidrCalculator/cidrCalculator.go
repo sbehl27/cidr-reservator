@@ -53,8 +53,7 @@ func (c cidrCalculator) GetNextNetmask() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	firstCidrSubnetFirstIP, firstCidrSubnetLastIP := cidr.AddressRange(firstCidrSubnet)
-	if len(ipNets) == 0 || (!ipNets[len(ipNets)-1].Contains(firstCidrSubnetFirstIP) && !ipNets[len(ipNets)-1].Contains(firstCidrSubnetLastIP)) {
+	if len(ipNets) == 0 || (cidr.VerifyNoOverlap(append(ipNets, firstCidrSubnet), c.baseIPNet) == nil) {
 		nextIPNet = firstCidrSubnet
 	} else {
 		nextIPNet, err = c.recursivelyFindNextNetmask(&ipNets, c.prefixLength, false)
